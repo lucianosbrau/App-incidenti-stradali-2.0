@@ -25,6 +25,7 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+        <activity android:name=".PdfViewerActivity" android:exported="false" />
     </application>
     <uses-permission android:name="android.permission.INTERNET" />
 </manifest>

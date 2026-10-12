@@ -62,30 +62,13 @@ object ManualeRepository {
     }
 
     /**
-     * Apre il PDF locale (copiandolo in cache se necessario) alla pagina desiderata.
-     * Usa FileProvider per condividere il file con il viewer PDF esterno.
+     * Apre il viewer PDF integrato all'indice di pagina PDF specificato (1-based).
+     * pagStampata + offsetPdf = pagina PDF.
      */
     fun apriPdf(ctx: android.content.Context, pagStampata: Int) {
-        val cacheFile = File(ctx.cacheDir, pdfNome)
-        if (!cacheFile.exists() || cacheFile.length() == 0L) {
-            ctx.assets.open("data/$pdfNome").use { input ->
-                cacheFile.outputStream().use { output -> input.copyTo(output) }
-            }
+        val intent = Intent(ctx, PdfViewerActivity::class.java).apply {
+            putExtra(PdfViewerActivity.EXTRA_PAGINA_PDF, pagStampata + offsetPdf)
         }
-        val uri: Uri = FileProvider.getUriForFile(ctx, "com.vvf.incidentistradali.fileprovider", cacheFile)
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/pdf")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        try {
-            ctx.startActivity(intent)
-        } catch (e: Exception) {
-            val fallback = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/pdf")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            try { ctx.startActivity(fallback) } catch (e2: Exception) { }
-        }
+        ctx.startActivity(intent)
     }
 }
