@@ -48,6 +48,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
@@ -508,6 +509,7 @@ private fun <T> rows(chunks: List<List<T>>): List<List<T>> = chunks
 fun SchedaScreen(s: Scheda, onBack: () -> Unit) {
     val color = parseColor(Repository.coloreParte(s.parte))
     val ctx = LocalContext.current
+    var fullscreenSlide by remember { mutableStateOf<Bitmap?>(null) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -575,7 +577,8 @@ fun SchedaScreen(s: Scheda, onBack: () -> Unit) {
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .border(1.dp, Color(0xFFDDDDDD), RoundedCornerShape(10.dp)),
+                                    .border(1.dp, Color(0xFFDDDDDD), RoundedCornerShape(10.dp))
+                                    .clickable { fullscreenSlide = bmp },
                                 contentScale = ContentScale.FillWidth
                             )
                         }
@@ -595,7 +598,10 @@ fun SchedaScreen(s: Scheda, onBack: () -> Unit) {
                 }
             }
         }
+        if (fullscreenSlide != null) {
+        FullscreenSlide(fullscreenSlide!!) { fullscreenSlide = null }
     }
+}
 }
 
 @Composable
