@@ -1,5 +1,6 @@
 package com.vvf.incidentistradali
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
 import android.os.Bundle
@@ -8,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,73 +29,97 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.foundation.gestures.detectTapGestures
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import android.graphics.pdf.PdfRenderer
+import android.util.LruCache
+import androidx.core.content.FileProvider
 import java.io.File
 
 /**
  * Viewer PDF integrato basato su PdfRenderer (offline, nessuna dipendenza esterna).
- * Renderizza le pagine con lazy loading e saltando direttamente alla pagina richiesta.
+ * - copia del PDF in cache verificata per dimensione (ripara copie corrotte)
+ * - LruCache per le pagine renderizzate (memoria limitata)
+ * - errore visibile con fallback al visualizzatore esterno
  */
 class PdfViewerActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_PAGINA_PDF = "pagina_pdf" // 1-based
+        private const val PDF_ASSET = "data/manuale.pdf"
+        private const val EXPECTED_SIZE = 12726948L
     }
 
     private var rendererRef: PdfRenderer? = null
-    private val bitmaps = mutableMapOf<Int, Bitmap>()
+    private val pageCache = LruCache<Int, Bitmap>(24 * 1024 * 1024) // 24 MB di bitmap
     private var numPagine = 0
+    private var erroreApertura: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val paginaRichiesta = intent.getIntExtra(EXTRA_PAGINA_PDF, 1)
-        val pdfFile = ensurePdfInCache()
         setContent {
             MaterialTheme {
-                ViewerContent(pdfFile, paginaRichiesta)
+                ViewerContent(paginaRichiesta)
             }
         }
     }
 
     private fun ensurePdfInCache(): File {
         val f = File(cacheDir, "manuale.pdf")
-        if (!f.exists() || f.length() == 0L) {
-            assets.open("data/manuale.pdf").use { input ->
+        if (!f.exists() || f.length() != EXPECTED_SIZE) {
+            f.delete()
+            assets.open(PDF_ASSET).use { input ->
                 f.outputStream().use { output -> input.copyTo(output) }
             }
         }
         return f
     }
 
+    private fun openRenderer(): String? {
+        return try {
+            val file = ensurePdfInCache()
+            val fd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            val renderer = PdfRenderer(fd)
+            rendererRef = renderer
+            numPagine = renderer.pageCount
+            null
+        } catch (e: Exception) {
+            "Impossibile aprire il PDF: ${e.message}"
+        }
+    }
+
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    fun ViewerContent(pdfFile: File, paginaIniziale: Int) {
+    fun ViewerContent(paginaIniziale: Int) {
         val listState = rememberLazyListState()
-        var rendererPronto by remember { mutableStateOf(false) }
-        var paginaCorrente by remember { mutableStateOf(paginaIniziale) }
+        var stato by remember { mutableStateOf("caricamento") } // caricamento | pronto | errore
+        var errorMsg by remember { mutableStateOf("") }
 
         LaunchedEffect(Unit) {
-            withContext(Dispatchers.IO) {
-                try {
-                    val fd = ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY)
-                    rendererRef = PdfRenderer(fd)
-                    numPagine = rendererRef?.pageCount ?: 0
-                } catch (e: Exception) { }
+            val err = withContext(Dispatchers.IO) { openRenderer() }
+            if (err == null) {
+                stato = "pronto"
+                if (paginaIniziale > 1 && paginaIniziale <= numPagine) {
+                    listState.scrollToItem(paginaIniziale - 1)
+                }
+            } else {
+                errorMsg = err
+                stato = "errore"
             }
-            rendererPronto = true
-            if (paginaIniziale > 1) listState.scrollToItem(paginaIniziale - 1)
         }
 
         val visibleItem by remember { derivedStateOf { listState.firstVisibleItemIndex + 1 } }
-        LaunchedEffect(visibleItem) { paginaCorrente = visibleItem }
 
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Manuale — pag. ${paginaCorrente - 10}", fontSize = 15.sp) },
+                    title = {
+                        Text(
+                            if (stato == "pronto") "Manuale — pag. ${visibleItem - 10}" else "Manuale",
+                            fontSize = 15.sp
+                        )
+                    },
                     navigationIcon = {
                         IconButton(onClick = { finish() }) { Icon(Icons.Filled.ArrowBack, "indietro") }
                     },
@@ -105,22 +131,42 @@ class PdfViewerActivity : ComponentActivity() {
                 )
             }
         ) { padding ->
-            if (!rendererPronto) {
-                Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator()
-                        Spacer(Modifier.height(10.dp))
-                        Text("Apertura manuale…", fontSize = 13.sp, color = Color.Gray)
+            when (stato) {
+                "caricamento" -> {
+                    Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator()
+                            Spacer(Modifier.height(10.dp))
+                            Text("Apertura manuale…", fontSize = 13.sp, color = Color.Gray)
+                        }
                     }
                 }
-            } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.padding(padding).fillMaxSize().background(Color(0xFF2A2A30)),
-                    contentPadding = PaddingValues(vertical = 4.dp)
-                ) {
-                    itemsIndexed(List(numPagine) { it }) { _, pageIdx ->
-                        PaginaItem(pageIdx, rendererPronto)
+                "errore" -> {
+                    Column(
+                        Modifier.padding(padding).fillMaxSize().padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text("⚠️", fontSize = 40.sp)
+                        Spacer(Modifier.height(10.dp))
+                        Text(errorMsg, fontSize = 14.sp, color = Color.Gray)
+                        Spacer(Modifier.height(20.dp))
+                        Button(onClick = { apriConViewerEsterno() }) {
+                            Text("Apri con visualizzatore PDF esterno")
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(onClick = { finish() }) { Text("Chiudi") }
+                    }
+                }
+                else -> {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.padding(padding).fillMaxSize().background(Color(0xFF2A2A30)),
+                        contentPadding = PaddingValues(vertical = 4.dp)
+                    ) {
+                        itemsIndexed(List(numPagine) { it }) { _, pageIdx ->
+                            PaginaItem(pageIdx)
+                        }
                     }
                 }
             }
@@ -128,15 +174,17 @@ class PdfViewerActivity : ComponentActivity() {
     }
 
     @Composable
-    fun PaginaItem(pageIdx: Int, rendererPronto: Boolean) {
-        var bmp by remember(pageIdx) { mutableStateOf<Bitmap?>(bitmaps[pageIdx]) }
-        // riprova il rendering quando il renderer diventa pronto
-        LaunchedEffect(pageIdx, rendererPronto) {
-            if (bmp == null && rendererPronto) {
+    fun PaginaItem(pageIdx: Int) {
+        var bmp by remember(pageIdx) { mutableStateOf<Bitmap?>(pageCache.get(pageIdx)) }
+        var failed by remember(pageIdx) { mutableStateOf(false) }
+        LaunchedEffect(pageIdx) {
+            if (bmp == null && !failed) {
                 val b = withContext(Dispatchers.IO) { renderPage(pageIdx) }
                 if (b != null) {
-                    bitmaps[pageIdx] = b
+                    pageCache.put(pageIdx, b)
                     bmp = b
+                } else {
+                    failed = true
                 }
             }
         }
@@ -146,19 +194,21 @@ class PdfViewerActivity : ComponentActivity() {
                 .padding(horizontal = 6.dp, vertical = 3.dp),
             contentAlignment = Alignment.Center
         ) {
-            if (bmp != null) {
-                Image(
+            when {
+                bmp != null -> Image(
                     bitmap = bmp!!.asImageBitmap(),
                     contentDescription = "Pagina ${pageIdx + 1}",
                     modifier = Modifier.fillMaxWidth(),
                     contentScale = ContentScale.FillWidth
                 )
-            } else {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(400.dp)
-                        .background(Color(0xFF3A3A40)),
+                failed -> Box(
+                    Modifier.fillMaxWidth().height(120.dp).background(Color(0xFF3A3A40)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Errore nel rendering della pag. ${pageIdx + 1}", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+                }
+                else -> Box(
+                    Modifier.fillMaxWidth().height(400.dp).background(Color(0xFF3A3A40)),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -176,7 +226,7 @@ class PdfViewerActivity : ComponentActivity() {
         return try {
             synchronized(renderer) {
                 renderer.openPage(index).use { page ->
-                    val targetW = 1080
+                    val targetW = 720
                     val ratio = page.height.toFloat() / page.width.toFloat()
                     val targetH = (targetW * ratio).toInt()
                     val bmp = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.RGB_565)
@@ -190,10 +240,24 @@ class PdfViewerActivity : ComponentActivity() {
         }
     }
 
+    private fun apriConViewerEsterno() {
+        try {
+            val file = ensurePdfInCache()
+            val uri = FileProvider.getUriForFile(this, "com.vvf.incidentistradali.fileprovider", file)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/pdf")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            finish()
+        }
+    }
+
     override fun onDestroy() {
         rendererRef?.close()
         rendererRef = null
-        bitmaps.clear()
+        pageCache.evictAll()
         super.onDestroy()
     }
 }
