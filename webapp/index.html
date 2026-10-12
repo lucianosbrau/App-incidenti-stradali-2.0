@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#202060">
+<title>Incidenti Stradali 2.0 — CNVVF</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/logo_vvf.png">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+:root {
+  --p1:#202060; --p2:#00A0C0; --p3:#C04080; --p4:#60C060; --p5:#00652E; --p6:#E57525; --p7:#ED2323;
+}
+body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background:#f5f5f7; color:#1a1a1a; min-height:100vh; }
+#splash { position:fixed; inset:0; background:#202060; z-index:100; display:flex; flex-direction:column; align-items:center; justify-content:center; transition:opacity .5s; }
+#splash.hide { opacity:0; pointer-events:none; }
+#splash img { max-width:88vw; max-height:62vh; border-radius:10px; box-shadow:0 8px 40px rgba(0,0,0,.5); }
+#splash .t { color:#fff; text-align:center; margin-top:20px; font-weight:700; font-size:15px; letter-spacing:.5px; }
+#splash .s { color:rgba(255,255,255,.75); font-size:11px; margin-top:6px; }
+#splash .bar { width:170px; height:4px; border-radius:4px; background:rgba(255,255,255,.2); margin-top:14px; overflow:hidden; }
+#splash .bar i { display:block; height:100%; width:40%; background:#fff; border-radius:4px; animation:slide 1s infinite; }
+@keyframes slide { 0%{transform:translateX(-100%)} 100%{transform:translateX(280%)} }
+header { position:sticky; top:0; z-index:10; background:var(--hc,#202060); color:#fff; padding:12px 14px; display:flex; align-items:center; gap:10px; box-shadow:0 2px 8px rgba(0,0,0,.15); }
+header h1 { font-size:16px; font-weight:700; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+header button { background:none; border:none; color:#fff; font-size:20px; cursor:pointer; padding:4px 8px; font-family:inherit; }
+header button:active { opacity:.6; }
+#searchbar { padding:10px 14px 4px; }
+#searchbar input { width:100%; padding:11px 14px; border-radius:12px; border:1.5px solid #d8d8de; background:#fff; font-size:15px; outline:none; font-family:inherit; }
+#searchbar input:focus { border-color:#202060; }
+main { max-width:760px; margin:0 auto; padding:10px 14px 90px; }
+.parte-card { display:flex; align-items:center; gap:14px; background:#fff; border:1.5px solid var(--c); border-radius:14px; padding:14px 16px; margin:8px 0; cursor:pointer; background:linear-gradient(0deg, color-mix(in srgb, var(--c) 7%, #fff), color-mix(in srgb, var(--c) 7%, #fff)); }
+.parte-card:active { transform:scale(.98); }
+.parte-card .n { width:44px; height:44px; min-width:44px; border-radius:10px; background:var(--c); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:19px; }
+.parte-card .t { font-weight:600; font-size:16px; }
+.parte-card .sub { font-size:12px; color:#777; margin-top:2px; }
+.scheda-row { display:flex; align-items:center; gap:10px; background:#fff; border-radius:12px; padding:12px 14px; margin:6px 0; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+.scheda-row:active { background:#f0f0f4; }
+.scheda-row .dot { width:8px; min-width:8px; height:8px; border-radius:4px; background:var(--c); }
+.scheda-row .tt { font-size:14.5px; font-weight:500; }
+.scheda-row .pp { font-size:12px; color:#777; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.scheda-row .meta { font-size:11px; color:var(--c); margin-top:2px; }
+.scheda-row .vid { font-size:20px; }
+.tagcloud { display:flex; flex-wrap:wrap; gap:6px; padding:8px 0 14px; }
+.tag { font-size:12px; padding:6px 13px; border-radius:20px; background:rgba(32,32,96,.08); color:#202060; cursor:pointer; border:1px solid transparent; }
+.tag.on { background:#202060; color:#fff; font-weight:700; }
+.count { font-size:12px; color:#777; padding:0 4px 6px; }
+.nores { text-align:center; color:#888; padding:40px 20px; font-size:14px; }
+.dettaglio .backbtn { font-size:22px; }
+.dettaglio h2 { font-size:19px; margin:6px 0 2px; }
+.dettaglio .para { color:var(--c); font-weight:600; font-size:14px; }
+.dettaglio .ref { color:#777; font-size:12px; margin:8px 0 4px; }
+.alertbox { display:flex; gap:10px; border-radius:10px; padding:12px; margin:10px 0; font-size:14px; }
+.alertbox.warn { background:#FDE7E7; border:1.5px solid #ED2323; }
+.alertbox.elec { background:#FFF8DC; border:1.5px solid #E0A800; }
+.alertbox b { display:block; font-size:12.5px; margin-bottom:3px; }
+.alertbox.warn b { color:#ED2323; } .alertbox.elec b { color:#B58900; }
+.testo { font-size:15px; line-height:1.55; margin-top:10px; white-space:pre-wrap; }
+.slideimg { width:100%; border-radius:10px; border:1px solid #ddd; margin-top:12px; }
+.videobtn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:13px; margin-top:14px; border:none; border-radius:12px; background:var(--c); color:#fff; font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; }
+.videobtn:active { opacity:.85; }
+footer { text-align:center; font-size:10.5px; color:#999; padding:18px 20px 26px; }
+.footer-home { position:fixed; bottom:0; left:0; right:0; background:#f5f5f7f2; border-top:1px solid #e5e5ea; padding:10px 14px calc(10px + env(safe-area-inset-bottom)); }
+.hidden { display:none !important; }
+</style>
+</head>
+<body>
+<div id="splash">
+  <img src="assets/cover_splash.png" alt="Copertina manuale">
+  <div class="t">MANUALE OPERATIVO<br>INCIDENTI STRADALI 2.0/2024</div>
+  <div class="s">Corpo Nazionale dei Vigili del Fuoco</div>
+  <div class="bar"><i></i></div>
+</div>
+<header id="hdr">
+  <button id="backBtn" class="hidden" onclick="navBack()">←</button>
+  <h1 id="hdrTitle">Incidenti Stradali 2.0</h1>
+  <button onclick="goSearch()">🔍</button>
+</header>
+<div id="searchbar" class="hidden"><input id="q" type="search" placeholder="Cerca manovra, argomento, tag…" oninput="renderSearch(this.value)"></div>
+<main id="main"></main>
+<div id="homeFooter" class="footer-home">GdL — Manuale Operativo Incidenti Stradali vers. 2.0/2024 CNVVF</div>
+<footer id="stdFooter" class="hidden">GdL — Manuale Operativo Incidenti Stradali vers. 2.0/2024 CNVVF</footer>
+
+<script>
+const PARTI = {
+  1:{titolo:"L'autoveicolo",colore:"#202060"},
+  2:{titolo:"Analisi di una collisione",colore:"#00A0C0"},
+  3:{titolo:"Informazioni indispensabili al soccorso",colore:"#C04080"},
+  4:{titolo:"Attrezzature per il soccorso",colore:"#60C060"},
+  5:{titolo:"La gestione dell'incidente",colore:"#00652E"},
+  6:{titolo:"Tecniche d'intervento",colore:"#E57525"},
+  7:{titolo:"Strategia d'intervento",colore:"#ED2323"}
+};
+let DATA = { schede: [] };
+let view = { page: "home" };
+let selectedTag = null;
+
+const esc = s => (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const col = p => PARTI[p]?.colore || "#202060";
+
+function schedaRow(s) {
+  const c = col(s.parte);
+  return `<div class="scheda-row" style="--c:${c}" onclick="openScheda('${s.id}')">
+    <div class="dot"></div>
+    <div style="flex:1;min-width:0">
+      <div class="tt">${esc(s.titolo)}</div>
+      ${s.paragrafo ? `<div class="pp">${esc(s.paragrafo)}</div>` : ""}
+      <div class="meta">Parte ${s.parte}${s.pagineManuale ? " · manuale p. " + esc(s.pagineManuale) : " · slide " + s.slide}</div>
+    </div>
+    ${s.videoUrl ? `<div class="vid">▶</div>` : ""}
+  </div>`;
+}
+
+function renderHome() {
+  view = { page: "home" };
+  document.getElementById("hdr").style.setProperty("--hc", "#202060");
+  document.getElementById("hdrTitle").textContent = "Incidenti Stradali 2.0";
+  document.getElementById("backBtn").classList.add("hidden");
+  document.getElementById("searchbar").classList.add("hidden");
+  document.getElementById("homeFooter").classList.remove("hidden");
+  document.getElementById("stdFooter").classList.add("hidden");
+  let h = "";
+  for (const [n, p] of Object.entries(PARTI)) {
+    const cnt = DATA.schede.filter(s => s.parte == n).length;
+    h += `<div class="parte-card" style="--c:${p.colore}" onclick="openParte(${n})">
+      <div class="n">${n}</div>
+      <div><div class="t">${esc(p.titolo)}</div><div class="sub">${cnt} schede</div></div>
+    </div>`;
+  }
+  document.getElementById("main").innerHTML = h;
+}
+
+function openParte(n) {
+  const prev = view.page, prevN = view.n;
+  view = { page: "parte", n, prev: prev, prevN: n };
+  const p = PARTI[n];
+  document.getElementById("hdr").style.setProperty("--hc", p.colore);
+  document.getElementById("hdrTitle").textContent = `PARTE ${n} — ${p.titolo}`;
+  document.getElementById("backBtn").classList.remove("hidden");
+  document.getElementById("searchbar").classList.remove("hidden");
+  document.getElementById("q").value = "";
+  document.getElementById("q").placeholder = "Filtra in questa parte…";
+  document.getElementById("q").oninput = function(){ renderParte(n, this.value); };
+  document.getElementById("homeFooter").classList.add("hidden");
+  document.getElementById("stdFooter").classList.remove("hidden");
+  renderParte(n, "");
+  window.scrollTo(0, 0);
+}
+
+function renderParte(n, q) {
+  const ql = q.trim().toLowerCase();
+  let list = DATA.schede.filter(s => s.parte == n);
+  if (ql.length >= 2) list = list.filter(s =>
+    s.titolo.toLowerCase().includes(ql) || (s.paragrafo||"").toLowerCase().includes(ql) || (s.testo||"").toLowerCase().includes(ql));
+  document.getElementById("main").innerHTML = list.map(schedaRow).join("") || `<div class="nores">Nessun risultato</div>`;
+}
+
+function goSearch() {
+  if (view.page === "search") { renderHome(); return; }
+  const prev = view.page, prevN = view.n;
+  view = { page: "search", prev, prevN };
+  selectedTag = null;
+  document.getElementById("hdr").style.setProperty("--hc", "#202060");
+  document.getElementById("hdrTitle").textContent = "Ricerca e tag";
+  document.getElementById("backBtn").classList.remove("hidden");
+  document.getElementById("searchbar").classList.remove("hidden");
+  const q = document.getElementById("q");
+  q.value = ""; q.placeholder = "Cerca in tutto il manuale…";
+  q.oninput = function(){ selectedTag = null; renderSearch(this.value); };
+  document.getElementById("homeFooter").classList.add("hidden");
+  document.getElementById("stdFooter").classList.remove("hidden");
+  renderSearch("");
+  q.focus();
+}
+
+function renderSearch(q) {
+  const tags = [...new Set(DATA.schede.flatMap(s => s.tags))].sort();
+  const tagHtml = tags.map(t =>
+    `<span class="tag ${selectedTag===t?'on':''}" onclick="tagClick('${t}')">${esc(t)}</span>`).join("");
+  let list = [];
+  if (selectedTag) list = DATA.schede.filter(s => s.tags.includes(selectedTag));
+  else if (q.trim().length >= 2) {
+    const ql = q.trim().toLowerCase();
+    list = DATA.schede.filter(s =>
+      s.titolo.toLowerCase().includes(ql) || (s.paragrafo||"").toLowerCase().includes(ql) ||
+      (s.testo||"").toLowerCase().includes(ql) || s.tags.some(t => t.toLowerCase().includes(ql)));
+  }
+  document.getElementById("main").innerHTML =
+    `<div class="tagcloud">${tagHtml}</div>
+     <div class="count">${list.length ? list.length + " risultati" : (q||selectedTag ? "Nessun risultato" : "Digita almeno 2 lettere o scegli un tag")}</div>`
+    + list.map(schedaRow).join("");
+}
+
+function tagClick(t) { selectedTag = selectedTag === t ? null : t; renderSearch(""); }
+
+function openScheda(id) {
+  const s = DATA.schede.find(x => x.id === id);
+  if (!s) return;
+  const prev = view.page, prevN = view.n;
+  view = { page: "scheda", id, prev, prevN };
+  const c = col(s.parte);
+  document.getElementById("hdr").style.setProperty("--hc", c);
+  document.getElementById("hdrTitle").textContent = s.titolo;
+  document.getElementById("backBtn").classList.remove("hidden");
+  document.getElementById("searchbar").classList.add("hidden");
+  document.getElementById("homeFooter").classList.add("hidden");
+  document.getElementById("stdFooter").classList.add("hidden");
+  let h = `<div class="dettaglio">
+    ${s.paragrafo ? `<div class="para" style="--c:${c}">${esc(s.paragrafo)}</div>` : ""}
+    <h2>${esc(s.titolo)}</h2>
+    <div class="ref">Parte ${s.parte} · ${esc(PARTI[s.parte].titolo)}${s.pagineManuale ? " · Manuale p. " + esc(s.pagineManuale) : ""}</div>
+    ${s.tags && s.tags.length ? `<div class="tagcloud">${s.tags.map(t => `<span class="tag" onclick="tagFromDettaglio('${t}')">${esc(t)}</span>`).join("")}</div>` : ""}
+    ${(s.alert||[]).map(a => `<div class="alertbox ${a.tipo==='elettrocuzione'?'elec':'warn'}"><span>${a.tipo==='elettrocuzione'?'⚡':'⚠️'}</span><div><b>ATTENZIONE!</b>${esc(a.testo)}</div></div>`).join("")}
+    ${s.testo ? `<div class="testo">${esc(s.testo)}</div>` : ""}
+    ${s.videoUrl ? `<button class="videobtn" style="--c:${c}" onclick="window.open('${s.videoUrl}','_blank')">▶ Guarda il video della manovra</button>` : ""}
+    <img class="slideimg" src="data/slide_img/slide_${String(s.slide).padStart(3,'0')}.jpg" alt="Slide ${s.slide}" loading="lazy">
+  </div>`;
+  document.getElementById("main").innerHTML = h;
+  window.scrollTo(0, 0);
+}
+
+function tagFromDettaglio(t) { goSearch(); selectedTag = t; renderSearch(""); }
+
+function navBack() {
+  if (view.page === "scheda") {
+    if (view.prev === "parte") openParte(view.prevN);
+    else if (view.prev === "search") { goSearch(); }
+    else renderHome();
+  } else renderHome();
+}
+
+fetch("data/content.json").then(r => r.json()).then(d => {
+  DATA = d;
+  setTimeout(() => document.getElementById("splash").classList.add("hide"), 1600);
+  renderHome();
+}).catch(e => {
+  document.getElementById("main").innerHTML = `<div class="nores">Errore caricamento contenuti</div>`;
+  document.getElementById("splash").classList.add("hide");
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "Incidenti Stradali 2.0 — CNVVF",
+  "short_name": "Incidenti 2.0",
+  "description": "Consultazione rapida del Manuale Operativo Incidenti Stradali 2.0/2024 CNVVF",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#202060",
+  "theme_color": "#202060",
+  "icons": [
+    { "src": "assets/logo_vvf.png", "sizes": "431x438", "type": "image/png", "purpose": "any" }
+  ]
+}
