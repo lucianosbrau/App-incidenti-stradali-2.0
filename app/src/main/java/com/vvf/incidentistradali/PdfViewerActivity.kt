@@ -177,13 +177,16 @@ class PdfViewerActivity : ComponentActivity() {
     fun PaginaItem(pageIdx: Int) {
         var bmp by remember(pageIdx) { mutableStateOf<Bitmap?>(pageCache.get(pageIdx)) }
         var failed by remember(pageIdx) { mutableStateOf(false) }
-        LaunchedEffect(pageIdx) {
-            if (bmp == null && !failed) {
+        var errorMsg by remember(pageIdx) { mutableStateOf<String?>(null) }
+        var retry by remember(pageIdx) { mutableStateOf(0) }
+        LaunchedEffect(pageIdx, retry) {
+            if (bmp == null) {
                 val b = withContext(Dispatchers.IO) { renderPage(pageIdx) }
                 if (b != null) {
                     pageCache.put(pageIdx, b)
                     bmp = b
                 } else {
+                    errorMsg = lastRenderError
                     failed = true
                 }
             }
@@ -201,11 +204,19 @@ class PdfViewerActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxWidth(),
                     contentScale = ContentScale.FillWidth
                 )
-                failed -> Box(
-                    Modifier.fillMaxWidth().height(120.dp).background(Color(0xFF3A3A40)),
-                    contentAlignment = Alignment.Center
+                failed -> Column(
+                    Modifier.fillMaxWidth().background(Color(0xFF3A3A40)).padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Errore nel rendering della pag. ${pageIdx + 1}", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+                    Text("Errore nel rendering della pag. ${pageIdx + 1}", color = Color.White, fontSize = 13.sp)
+                    if (errorMsg != null) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(errorMsg!!, color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = { failed = false; retry++ }) {
+                        Text("Riprova", fontSize = 12.sp)
+                    }
                 }
                 else -> Box(
                     Modifier.fillMaxWidth().height(400.dp).background(Color(0xFF3A3A40)),
@@ -221,6 +232,8 @@ class PdfViewerActivity : ComponentActivity() {
         }
     }
 
+    private var lastRenderError: String? = null
+
     private fun renderPage(index: Int): Bitmap? {
         val renderer = rendererRef ?: return null
         return try {
@@ -229,13 +242,14 @@ class PdfViewerActivity : ComponentActivity() {
                     val targetW = 720
                     val ratio = page.height.toFloat() / page.width.toFloat()
                     val targetH = (targetW * ratio).toInt()
-                    val bmp = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.RGB_565)
+                    val bmp = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888)
                     bmp.eraseColor(AndroidColor.WHITE)
                     page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                     bmp
                 }
             }
         } catch (e: Exception) {
+            lastRenderError = "${e.javaClass.simpleName}: ${e.message}"
             null
         }
     }
