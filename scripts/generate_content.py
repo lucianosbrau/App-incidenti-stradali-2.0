@@ -59,8 +59,9 @@ def build_scheda(num):
         if t.startswith("tutor:"): continue
         if re.fullmatch(r"\d+(\.\d+)?", t) and sz < 25: continue  # numero slide
         if sz == 22 and t == "!": continue
-        if col == 0x797979 and sz >= 50 and titolo is None:
-            titolo = t; continue
+        if col == 0x797979 and sz >= 50:
+            titolo = (titolo + " " + t).strip() if titolo else t
+            continue
         if col in (0xED2323, 0xE57525, 0x00652E, 0x042EEE, 0x00A0C0, 0xC04080, 0x60C060, 0x202060) and sz in (30.0,) and paragrafo is None and t != "!":
             if not t.startswith("ATTENZIONE") and "d'intervento" not in t and "d\u2019intervento" not in t and len(t) > 3 and col != 0xED2324:
                 paragrafo = t; continue
