@@ -26,7 +26,7 @@ object Repository {
     val tuttiTag: List<String>
 
     init {
-        val ctx = App.instance
+        val ctx = checkNotNull(App.instance) { "Application context non inizializzato" }
         val partsJson = JSONObject(ctx.assets.open("data/content.json").bufferedReader().use { it.readText() })
         val partiMap = partsJson.getJSONObject("parti")
         parti = (1..7).map { n ->
