@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -393,7 +394,9 @@ fun SearchScreen(onScheda: (String) -> Unit, onBack: () -> Unit) {
 fun ManualeScreen(onBack: () -> Unit) {
     var query by remember { mutableStateOf("") }
     val ctx = LocalContext.current
+    val focusManager = LocalFocusManager.current
     val risultati = remember(query) { ManualeRepository.search(query) }
+    val ricercaAttiva = query.trim().length >= 3
 
     Scaffold(
         topBar = {
@@ -412,12 +415,13 @@ fun ManualeScreen(onBack: () -> Unit) {
                 leadingIcon = { Icon(Icons.Filled.Search, null) },
                 trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }) { Icon(Icons.Filled.Close, null) } },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { }),
+                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             )
             LazyColumn {
+                if (!ricercaAttiva) {
                 item {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                         Text("PARTI DEL MANUALE", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
@@ -442,16 +446,19 @@ fun ManualeScreen(onBack: () -> Unit) {
                                 }
                             }
                         }
-                        if (query.length >= 3) {
-                            Spacer(Modifier.height(10.dp))
-                            Text(
-                                if (risultati.isEmpty()) "Nessuna pagina contiene \"$query\"" else "${risultati.size} pagine con \"$query\"",
-                                fontSize = 12.sp, color = Color.Gray
-                            )
-                        }
                     }
                 }
-                if (query.length >= 3) {
+                }
+                if (ricercaAttiva) {
+                    item {
+                        Text(
+                            if (risultati.isEmpty()) "Nessuna pagina contiene \"$query\"" else "${risultati.size} pagine con \"$query\"",
+                            fontSize = 12.sp, color = Color.Gray,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+                if (ricercaAttiva) {
                     items(risultati, key = { it.pagStampata }) { r ->
                         val color = if (r.parte in 1..7) parseColor(Repository.coloreParte(r.parte)) else Color(0xFF555555)
                         Column(
