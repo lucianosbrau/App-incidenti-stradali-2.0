@@ -133,6 +133,20 @@ function goManuale() {
   window.scrollTo(0, 0);
 }
 
+const PARTI_RANGE = [
+  { n:1, da:1,  a:34,  titolo:"L'autoveicolo", colore:"#202060" },
+  { n:2, da:35, a:40,  titolo:"Analisi di una collisione", colore:"#00A0C0" },
+  { n:3, da:41, a:52,  titolo:"Informazioni indispensabili al soccorso", colore:"#C04080" },
+  { n:4, da:53, a:72,  titolo:"Attrezzature per il soccorso", colore:"#60C060" },
+  { n:5, da:73, a:98,  titolo:"La gestione dell'incidente", colore:"#00652E" },
+  { n:6, da:99, a:134, titolo:"Tecniche d'intervento", colore:"#E57525" },
+  { n:7, da:135,a:269, titolo:"Strategia d'intervento", colore:"#ED2323" },
+  { n:0, da:270,a:9999, titolo:"Glossario e allegati", colore:"#555555" }
+];
+function parteDellaPagina(p) {
+  return PARTI_RANGE.find(x => p >= x.da && p <= x.a) || { n:0, titolo:"", colore:"#555555" };
+}
+
 function pdfPageOf(printed) { return printed + (MANUAL.offsetPdf || 10); }
 
 function openPdfAt(printedPage) {
@@ -153,15 +167,23 @@ function renderManuale(q) {
       const idx = txt.toLowerCase().indexOf(ql);
       if (idx >= 0) {
         const printed = i + 1 - (MANUAL.offsetPdf || 10);
-        if (printed >= 1) res.push({ printed, snip: txt.slice(Math.max(0, idx - 60), idx + 90) });
+        if (printed >= 1) {
+          let from = Math.max(0, idx - 60);
+          const snip = txt.slice(from, idx + 90);
+          res.push({ printed, snip, from });
+        }
       }
     });
     h += `<div class="count">${res.length} pagine con "${esc(q.trim())}"</div>`;
-    h += res.slice(0, 50).map(r => `<div class="scheda-row" style="--c:#202060" onclick="openPdfAt(${r.printed})">
+    h += res.slice(0, 50).map(r => {
+      const sec = parteDellaPagina(r.printed);
+      const boldSnip = esc(r.snip).replace(new RegExp("(" + ql.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "gi"), "<b>$1</b>");
+      return `<div class="scheda-row" style="--c:${sec.colore}" onclick="openPdfAt(${r.printed})">
       <div style="flex:1;min-width:0">
-        <div class="tt">Manuale p. ${r.printed}</div>
-        <div class="pp">…${esc(r.snip)}…</div>
-      </div></div>`).join("");
+        <div class="tt" style="color:${sec.colore}">Manuale p. ${r.printed} — PARTE ${sec.n} · ${esc(sec.titolo)}</div>
+        <div class="pp">…${boldSnip}…</div>
+      </div></div>`;
+    }).join("");
     if (!res.length) h += `<div class="nores">Nessuna pagina contiene "${esc(q.trim())}"</div>`;
   } else {
     h += `<div class="nores">Digita almeno 3 lettere per cercare nel testo del manuale (PDF 2.0/2024).<br><br>Tocca una PARTE per aprire il PDF alla pagina iniziale.</div>`;
