@@ -28,11 +28,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -52,6 +52,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,6 +71,11 @@ private fun loadSlideImage(path: String): Bitmap? = try {
 
 fun parseColor(hex: String): Color = Color(android.graphics.Color.parseColor(hex))
 
+object NavState {
+    var lastSearchQuery: String = ""
+    var lastSearchTag: String? = null
+}
+
 @Composable
 fun ManualeApp() {
     val nav = rememberNavController()
@@ -86,7 +92,7 @@ fun ManualeApp() {
     }
 
     NavHost(nav, startDestination = "home") {
-        composable("home") { HomeScreen(onParte = { nav.navigate("parte/$it") }, onSearch = { nav.navigate("search") }, onScheda = { nav.navigate("scheda/$it") }) }
+        composable("home") { HomeScreen(onParte = { nav.navigate("parte/$it") }, onSearch = { nav.navigate("search") }, onScheda = { nav.navigate("scheda/$it") }, onManuale = { nav.navigate("manuale") }) }
         composable("parte/{n}", arguments = listOf(navArgument("n") { type = androidx.navigation.NavType.IntType })) { entry ->
             val n = entry.arguments?.getInt("n") ?: 1
             ParteScreen(n, onScheda = { nav.navigate("scheda/$it") }, onBack = { nav.popBackStack() })
@@ -97,6 +103,7 @@ fun ManualeApp() {
             val s = Repository.schede.firstOrNull { it.id == id }
             if (s != null) SchedaScreen(s, onBack = { nav.popBackStack() })
         }
+        composable("manuale") { ManualeScreen(onBack = { nav.popBackStack() }) }
     }
 }
 
@@ -142,18 +149,46 @@ fun SplashScreen() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onParte: (Int) -> Unit, onSearch: () -> Unit, onScheda: (String) -> Unit) {
+fun HomeScreen(onParte: (Int) -> Unit, onSearch: () -> Unit, onScheda: (String) -> Unit, onManuale: () -> Unit) {
     var query by remember { mutableStateOf("") }
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
     val risultati = remember(query) { if (query.length >= 2) Repository.search(query) else emptyList() }
 
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet {
+                Column(Modifier.padding(16.dp)) {
+                    Text("MENU", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.Gray)
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { scope.launch { drawerState.close() }; onManuale() }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("\uD83D\uDCD6", fontSize = 20.sp)
+                        Spacer(Modifier.width(12.dp))
+                        Text("Cerca nel manuale", fontSize = 16.sp)
+                    }
+                }
+            }
+        }
+    ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Incidenti Stradali 2.0", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = { scope.launch { drawerState.open() } }) { Icon(Icons.Filled.Menu, "Menu") }
+                },
                 actions = {
                     IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, "Ricerca") }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF202060), titleContentColor = Color.White, actionIconContentColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF202060), titleContentColor = Color.White, navigationIconContentColor = Color.White, actionIconContentColor = Color.White)
             )
         }
     ) { padding ->
@@ -186,9 +221,8 @@ fun HomeScreen(onParte: (Int) -> Unit, onSearch: () -> Unit, onScheda: (String) 
             }
         }
     }
+    }
 }
-
-
 
 @Composable
 fun SezioniGrid(onParte: (Int) -> Unit) {
@@ -300,8 +334,8 @@ fun ParteScreen(n: Int, onScheda: (String) -> Unit, onBack: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(onScheda: (String) -> Unit, onBack: () -> Unit) {
-    var query by remember { mutableStateOf("") }
-    var tagSelezionato by remember { mutableStateOf<String?>(null) }
+    var query by remember { mutableStateOf(NavState.lastSearchQuery) }
+    var tagSelezionato by remember { mutableStateOf<String?>(NavState.lastSearchTag) }
     val risultati = when {
         tagSelezionato != null -> Repository.searchByTag(tagSelezionato!!)
         query.length >= 2 -> Repository.search(query)
@@ -320,14 +354,14 @@ fun SearchScreen(onScheda: (String) -> Unit, onBack: () -> Unit) {
         Column(Modifier.padding(padding).fillMaxSize()) {
             OutlinedTextField(
                 value = query,
-                onValueChange = { query = it; tagSelezionato = null },
+                onValueChange = { query = it; tagSelezionato = null; NavState.lastSearchQuery = it; NavState.lastSearchTag = null },
                 placeholder = { Text("Cerca in tutto il manuale…") },
                 leadingIcon = { Icon(Icons.Filled.Search, null) },
                 trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }) { Icon(Icons.Filled.Close, null) } },
                 modifier = Modifier.fillMaxWidth().padding(16.dp, 8.dp)
             )
             Text("Tag principali", Modifier.padding(horizontal = 16.dp), fontWeight = FontWeight.SemiBold)
-            FlowRowTags(tagSelezionato) { tagSelezionato = if (tagSelezionato == it) null else it; query = "" }
+            FlowRowTags(tagSelezionato) { tagSelezionato = if (tagSelezionato == it) null else it; query = ""; NavState.lastSearchTag = tagSelezionato; NavState.lastSearchQuery = "" }
             Text(
                 if (risultati.isEmpty()) "Nessun risultato" else "${risultati.size} risultati",
                 Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
@@ -336,6 +370,96 @@ fun SearchScreen(onScheda: (String) -> Unit, onBack: () -> Unit) {
             LazyColumn {
                 items(risultati, key = { it.id }) { s ->
                     SchedaRow(s) { onScheda(s.id) }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ManualeScreen(onBack: () -> Unit) {
+    var query by remember { mutableStateOf("") }
+    val ctx = LocalContext.current
+    val risultati = remember(query) { ManualeRepository.search(query) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Cerca nel manuale", fontSize = 16.sp) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, "indietro") } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF202060), titleContentColor = Color.White, navigationIconContentColor = Color.White)
+            )
+        }
+    ) { padding ->
+        Column(Modifier.padding(padding).fillMaxSize()) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = { Text("Cerca una parola nel manuale PDF…") },
+                leadingIcon = { Icon(Icons.Filled.Search, null) },
+                trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }) { Icon(Icons.Filled.Close, null) } },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+            Column(Modifier.padding(horizontal = 16.dp)) {
+                Text("PARTI DEL MANUALE", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+            }
+            LazyColumn {
+                item {
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                        ManualeRepository.parti.forEach { p ->
+                            val color = parseColor(Repository.coloreParte(p.n))
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(color.copy(alpha = 0.10f))
+                                    .clickable {
+                                        ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(ManualeRepository.pdfUrlFor(p.pagStampata))))
+                                    }
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(color))
+                                Spacer(Modifier.width(10.dp))
+                                Column {
+                                    Text("PARTE ${p.n} — ${p.titolo}", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                    Text("inizia a pag. ${p.pagStampata}", fontSize = 12.sp, color = Color.Gray)
+                                }
+                            }
+                        }
+                    }
+                }
+                if (query.length >= 3) {
+                    item {
+                        Text(
+                            if (risultati.isEmpty()) "Nessuna pagina contiene \"$query\"" else "${risultati.size} pagine con \"$query\"",
+                            Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                            fontSize = 12.sp, color = Color.Gray
+                        )
+                    }
+                    items(risultati, key = { it.pagStampata }) { r ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0x14202060))
+                                .clickable {
+                                    ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(ManualeRepository.pdfUrlFor(r.pagStampata))))
+                                }
+                                .padding(12.dp)
+                        ) {
+                            Column {
+                                Text("Manuale p. ${r.pagStampata}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF202060))
+                                Text("…${r.snippet}…", fontSize = 13.sp, color = Color.Gray, maxLines = 3)
+                            }
+                        }
+                    }
                 }
             }
         }
