@@ -102,12 +102,15 @@ fun ManualeApp() {
 
 @Composable
 fun SplashScreen() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(Color(0xFF202060)), contentAlignment = Alignment.Center) {
         Image(
             painter = painterResource(R.drawable.cover_splash),
             contentDescription = "Copertina manuale",
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.72f)
+                .clip(RoundedCornerShape(12.dp)),
+            contentScale = ContentScale.Fit
         )
         Column(
             Modifier
@@ -225,7 +228,7 @@ fun SezioniGrid(onParte: (Int) -> Unit) {
         }
         Spacer(Modifier.height(20.dp))
         Text(
-            "tutor: VE Di Lorenzo Luciano — Manuale Operativo Incidenti Stradali vers. 2.0/2024 CNVVF",
+            "GdL — Manuale Operativo Incidenti Stradali vers. 2.0/2024 CNVVF",
             fontSize = 11.sp, color = Color.Gray
         )
     }

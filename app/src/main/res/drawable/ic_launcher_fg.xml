@@ -1,12 +1,4 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,26L34,74h8l4.5-11h15L66,74h8L54,26zM49.5,56L54,45l4.5,11h-9z" />
-    <path
-        android:fillColor="#ED2323"
-        android:pathData="M38,80h32v4H38z" />
-</vector>
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/logo_vvf" android:gravity="center" />
+</layer-list>
