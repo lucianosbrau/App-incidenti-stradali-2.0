@@ -5,18 +5,26 @@ import org.json.JSONArray
 
 data class Alert(val tipo: String, val testo: String)
 
-data class Scheda(
-    val id: String,
+data class Blocco(
     val slide: Int,
-    val titolo: String,
-    val parte: Int,
-    val paragrafo: String,
-    val pagineManuale: String,
     val testo: String,
     val alert: List<Alert>,
+    val pagineManuale: String,
+    val paragrafo: String
+)
+
+data class Scheda(
+    val id: String,
+    val titolo: String,
+    val parte: Int,
+    val blocks: List<Blocco>,
     val tags: List<String>,
     val videoUrl: String?
-)
+) {
+    val primoSlide: Int get() = blocks.firstOrNull()?.slide ?: 0
+    val pagineManuale: String get() = blocks.map { it.pagineManuale }.filter { it.isNotBlank() }.distinct().joinToString(" / ")
+    val paragrafo: String get() = blocks.firstOrNull()?.paragrafo ?: ""
+}
 
 data class Parte(val numero: Int, val titolo: String, val coloreHex: String)
 
@@ -37,24 +45,34 @@ object Repository {
         val list = mutableListOf<Scheda>()
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
-            val alerts = mutableListOf<Alert>()
-            val ja = o.optJSONArray("alert") ?: JSONArray()
-            for (j in 0 until ja.length()) {
-                val a = ja.getJSONObject(j)
-                alerts.add(Alert(a.getString("tipo"), a.getString("testo")))
+            val jb = o.optJSONArray("blocks") ?: JSONArray()
+            val blocks = mutableListOf<Blocco>()
+            for (k in 0 until jb.length()) {
+                val b = jb.getJSONObject(k)
+                val alerts = mutableListOf<Alert>()
+                val ja = b.optJSONArray("alert") ?: JSONArray()
+                for (j in 0 until ja.length()) {
+                    val a = ja.getJSONObject(j)
+                    alerts.add(Alert(a.getString("tipo"), a.getString("testo")))
+                }
+                blocks.add(
+                    Blocco(
+                        slide = b.getInt("slide"),
+                        testo = b.optString("testo", ""),
+                        alert = alerts,
+                        pagineManuale = b.optString("pagineManuale", ""),
+                        paragrafo = b.optString("paragrafo", "")
+                    )
+                )
             }
             val jt = o.optJSONArray("tags") ?: JSONArray()
             val tags = (0 until jt.length()).map { jt.getString(it) }
             list.add(
                 Scheda(
                     id = o.getString("id"),
-                    slide = o.getInt("slide"),
                     titolo = o.getString("titolo"),
                     parte = o.getInt("parte"),
-                    paragrafo = o.optString("paragrafo", ""),
-                    pagineManuale = o.optString("pagineManuale", ""),
-                    testo = o.optString("testo", ""),
-                    alert = alerts,
+                    blocks = blocks,
                     tags = tags,
                     videoUrl = if (o.isNull("videoUrl") || o.optString("videoUrl").isBlank()) null else o.getString("videoUrl")
                 )
@@ -73,8 +91,7 @@ object Repository {
         if (query.length < 2) return emptyList()
         return schede.filter { s ->
             s.titolo.lowercase().contains(query) ||
-            s.paragrafo.lowercase().contains(query) ||
-            s.testo.lowercase().contains(query) ||
+            s.blocks.any { b -> b.testo.lowercase().contains(query) || b.paragrafo.lowercase().contains(query) } ||
             s.tags.any { it.lowercase().contains(query) }
         }
     }

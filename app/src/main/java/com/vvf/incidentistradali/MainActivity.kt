@@ -271,6 +271,7 @@ fun SezioniGrid(onParte: (Int) -> Unit) {
 @Composable
 fun SchedaRow(s: Scheda, onClick: () -> Unit) {
     val color = parseColor(Repository.coloreParte(s.parte))
+    val nb = s.blocks.size
     Row(
         Modifier
             .fillMaxWidth()
@@ -284,11 +285,20 @@ fun SchedaRow(s: Scheda, onClick: () -> Unit) {
         Box(Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(color))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(s.titolo, fontWeight = FontWeight.Medium, fontSize = 15.sp, maxLines = 2)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(s.titolo, fontWeight = FontWeight.Medium, fontSize = 15.sp, maxLines = 2, modifier = Modifier.weight(1f, fill = false))
+                if (nb > 1) {
+                    Spacer(Modifier.width(6.dp))
+                    Text("(${nb} slide)", fontSize = 11.sp, color = Color.Gray)
+                }
+            }
             if (s.paragrafo.isNotBlank()) {
                 Text(s.paragrafo, fontSize = 12.sp, color = Color.Gray, maxLines = 1)
             }
-            Text("Parte ${s.parte} · ${if (s.pagineManuale.isNotBlank()) "manuale p. ${s.pagineManuale}" else "slide ${s.slide}"}", fontSize = 11.sp, color = color)
+            Text(
+                "Parte ${s.parte}" + if (s.pagineManuale.isNotBlank()) " · manuale p. ${s.pagineManuale}" else " · slide ${s.primoSlide}",
+                fontSize = 11.sp, color = color
+            )
         }
         if (s.videoUrl != null) Icon(Icons.Filled.PlayCircle, "video", tint = color)
     }
@@ -301,8 +311,9 @@ fun ParteScreen(n: Int, onScheda: (String) -> Unit, onBack: () -> Unit) {
     val color = parseColor(parte.coloreHex)
     val schede = Repository.schedeDiParte(n)
     var query by remember { mutableStateOf("") }
-    val filtered = if (query.length >= 2) schede.filter {
-        it.titolo.lowercase().contains(query.lowercase()) || it.paragrafo.lowercase().contains(query.lowercase()) || it.testo.lowercase().contains(query.lowercase())
+    val ql = query.trim().lowercase()
+    val filtered = if (ql.length >= 2) schede.filter { s ->
+        s.titolo.lowercase().contains(ql) || s.blocks.any { b -> b.testo.lowercase().contains(ql) || b.paragrafo.lowercase().contains(ql) }
     } else schede
 
     Scaffold(
@@ -400,27 +411,25 @@ fun ManualeScreen(onBack: () -> Unit) {
                 leadingIcon = { Icon(Icons.Filled.Search, null) },
                 trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }) { Icon(Icons.Filled.Close, null) } },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { }),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             )
-            Column(Modifier.padding(horizontal = 16.dp)) {
-                Text("PARTI DEL MANUALE", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-            }
             LazyColumn {
                 item {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                        Text("PARTI DEL MANUALE", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
                         ManualeRepository.parti.forEach { p ->
-                            val color = parseColor(Repository.coloreParte(p.n))
+                            val color = parseColor(p.coloreHex)
                             Row(
                                 Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(color.copy(alpha = 0.10f))
-                                    .clickable {
-                                        ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(ManualeRepository.pdfUrlFor(p.pagStampata))))
-                                    }
+                                    .clickable { ManualeRepository.apriPdf(ctx, p.pagStampata) }
                                     .padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -432,32 +441,32 @@ fun ManualeScreen(onBack: () -> Unit) {
                                 }
                             }
                         }
+                        if (query.length >= 3) {
+                            Spacer(Modifier.height(10.dp))
+                            Text(
+                                if (risultati.isEmpty()) "Nessuna pagina contiene \"$query\"" else "${risultati.size} pagine con \"$query\"",
+                                fontSize = 12.sp, color = Color.Gray
+                            )
+                        }
                     }
                 }
                 if (query.length >= 3) {
-                    item {
-                        Text(
-                            if (risultati.isEmpty()) "Nessuna pagina contiene \"$query\"" else "${risultati.size} pagine con \"$query\"",
-                            Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                            fontSize = 12.sp, color = Color.Gray
-                        )
-                    }
                     items(risultati, key = { it.pagStampata }) { r ->
-                        Row(
+                        val color = if (r.parte in 1..7) parseColor(Repository.coloreParte(r.parte)) else Color(0xFF555555)
+                        Column(
                             Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 4.dp)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0x14202060))
-                                .clickable {
-                                    ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(ManualeRepository.pdfUrlFor(r.pagStampata))))
-                                }
+                                .background(color.copy(alpha = 0.10f))
+                                .clickable { ManualeRepository.apriPdf(ctx, r.pagStampata) }
                                 .padding(12.dp)
                         ) {
-                            Column {
-                                Text("Manuale p. ${r.pagStampata}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF202060))
-                                Text("…${r.snippet}…", fontSize = 13.sp, color = Color.Gray, maxLines = 3)
-                            }
+                            Text(
+                                "Manuale p. ${r.pagStampata} — PARTE ${if (r.parte > 0) r.parte else ""} ${r.titoloParte}",
+                                fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = color
+                            )
+                            Text("…${r.snippet}…", fontSize = 13.sp, color = Color.Gray, maxLines = 3)
                         }
                     }
                 }
@@ -520,26 +529,59 @@ fun SchedaScreen(s: Scheda, onBack: () -> Unit) {
                             "Parte ${s.parte} · ${Repository.parti.first { it.numero == s.parte }.titolo}",
                             fontSize = 12.sp, color = Color.Gray
                         )
-                        Spacer(Modifier.width(12.dp))
-                        if (s.pagineManuale.isNotBlank()) Text("Manuale p. ${s.pagineManuale}", fontSize = 12.sp, color = Color.Gray)
+                    }
+                    if (s.pagineManuale.isNotBlank()) {
+                        Text("Manuale p. ${s.pagineManuale}", fontSize = 12.sp, color = Color.Gray)
                     }
                     if (s.tags.isNotEmpty()) {
                         Spacer(Modifier.height(10.dp))
                         TagsInline(s.tags, color)
                     }
-                    Spacer(Modifier.height(14.dp))
-                    if (s.alert.isNotEmpty()) {
-                        s.alert.forEach { a ->
+                    s.blocks.forEach { b ->
+                        if (s.blocks.size > 1) {
+                            Spacer(Modifier.height(20.dp))
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(color.copy(alpha = 0.12f))
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    "Slide ${b.slide}" + if (b.pagineManuale.isNotBlank()) " · manuale p. ${b.pagineManuale}" else "",
+                                    fontSize = 13.sp, fontWeight = FontWeight.Bold, color = color
+                                )
+                            }
+                            Spacer(Modifier.height(8.dp))
+                        } else if (b.pagineManuale.isNotBlank()) {
+                            Spacer(Modifier.height(10.dp))
+                            Text("Manuale p. ${b.pagineManuale}", fontSize = 12.sp, color = Color.Gray)
+                        }
+                        b.alert.forEach { a ->
                             AlertBox(a, color)
                             Spacer(Modifier.height(10.dp))
                         }
-                        Spacer(Modifier.height(4.dp))
-                    }
-                    if (s.testo.isNotBlank()) {
-                        Text(s.testo, fontSize = 15.sp, lineHeight = 22.sp)
-                        Spacer(Modifier.height(14.dp))
+                        if (b.testo.isNotBlank()) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(b.testo, fontSize = 15.sp, lineHeight = 22.sp)
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        val imgName = "slide_img/slide_%03d.jpg".format(b.slide)
+                        val bmp = remember(s.id) { loadSlideImage(imgName) }
+                        if (bmp != null) {
+                            Image(
+                                bitmap = bmp.asImageBitmap(),
+                                contentDescription = "Slide ${b.slide}",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .border(1.dp, Color(0xFFDDDDDD), RoundedCornerShape(10.dp)),
+                                contentScale = ContentScale.FillWidth
+                            )
+                        }
                     }
                     if (s.videoUrl != null) {
+                        Spacer(Modifier.height(14.dp))
                         Button(
                             onClick = { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(s.videoUrl))) },
                             colors = ButtonDefaults.buttonColors(containerColor = color),
@@ -549,22 +591,6 @@ fun SchedaScreen(s: Scheda, onBack: () -> Unit) {
                             Spacer(Modifier.width(8.dp))
                             Text("Guarda il video della manovra")
                         }
-                        Spacer(Modifier.height(12.dp))
-                    }
-                    val imgName = "slide_img/slide_%03d.jpg".format(s.slide)
-                    val bmp = remember(s.id) { loadSlideImage(imgName) }
-                    if (bmp != null) {
-                        Text("Slide di riferimento", fontSize = 12.sp, color = Color.Gray)
-                        Spacer(Modifier.height(6.dp))
-                        Image(
-                            bitmap = bmp.asImageBitmap(),
-                            contentDescription = "Slide ${s.slide}",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .border(1.dp, Color(0xFFDDDDDD), RoundedCornerShape(10.dp)),
-                            contentScale = ContentScale.FillWidth
-                        )
                     }
                 }
             }
