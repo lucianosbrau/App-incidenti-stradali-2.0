@@ -188,7 +188,7 @@ fun HomeScreen(onParte: (Int) -> Unit, onSearch: () -> Unit, onScheda: (String) 
                             .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("\uD83D\uDE91", fontSize = 20.sp)
+                        Text("\uD83D\uDE92", fontSize = 20.sp)
                         Spacer(Modifier.width(12.dp))
                         Text("Consultazione rescue sheet", fontSize = 16.sp)
                     }
