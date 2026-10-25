@@ -176,6 +176,22 @@ fun HomeScreen(onParte: (Int) -> Unit, onSearch: () -> Unit, onScheda: (String) 
                         Spacer(Modifier.width(12.dp))
                         Text("Cerca nel manuale", fontSize = 16.sp)
                     }
+                    val ctxMenu = LocalContext.current
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable {
+                                scope.launch { drawerState.close() }
+                                ctxMenu.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://www.adac.de/rund-ums-fahrzeug/unfall-schaden-panne/rettungskarte/")))
+                            }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("\uD83D\uDE91", fontSize = 20.sp)
+                        Spacer(Modifier.width(12.dp))
+                        Text("Consultazione rescue sheet", fontSize = 16.sp)
+                    }
                 }
             }
         }

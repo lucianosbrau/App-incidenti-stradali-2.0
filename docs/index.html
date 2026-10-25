@@ -91,6 +91,7 @@ footer { text-align:center; font-size:10.5px; color:#999; padding:18px 20px 26px
   <div class="panel">
     <h3>Menu</h3>
     <a onclick="toggleDrawer(false); goManuale()">📖 Cerca nel manuale</a>
+    <a onclick="toggleDrawer(false); window.open('https://www.adac.de/rund-ums-fahrzeug/unfall-schaden-panne/rettungskarte/', '_blank')">🚑 Consultazione rescue sheet</a>
   </div>
 </div>
 <div id="searchbar" class="hidden"><input id="q" type="search" placeholder="Cerca manovra, argomento, tag…" oninput="renderSearch(this.value)" onkeydown="if(event.key==='Enter'){this.blur();}"></div>
